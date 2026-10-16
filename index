@@ -34,7 +34,7 @@
 
   <script>
     // ⚠️ 請替換為您的 Cloudflare Worker 網址 (結尾不要帶斜線)
-    const WORKER_URL = "https://請在這裡貼上您的Worker網址.workers.dev";
+    const WORKER_URL = "https://lunchbot.wpeanut001.workers.dev";
 
     async function processFiles() {
       const status = document.getElementById('status');
