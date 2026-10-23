@@ -1,150 +1,30 @@
-<!DOCTYPE html>
-<html>
-<head>
-  <meta charset="UTF-8">
-  <base target="_top">
-  <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
-  <style>
-    body { font-family: '微軟正黑體', sans-serif; padding: 20px; max-width: 500px; margin: auto; background-color: #f4f6f9; }
-    .card { background: white; padding: 25px; border-radius: 12px; box-shadow: 0 4px 10px rgba(0,0,0,0.1); }
-    h2 { text-align: center; color: #2c3e50; margin-bottom: 20px; }
-    label { font-weight: bold; display: block; margin-top: 15px; color: #34495e; }
-    input[type="file"], input[type="number"] { width: 100%; padding: 10px; margin-top: 5px; box-sizing: border-box; border: 1px solid #ccc; border-radius: 6px; }
-    button { width: 100%; padding: 12px; background-color: #27ae60; color: white; border: none; border-radius: 6px; font-size: 16px; font-weight: bold; cursor: pointer; margin-top: 25px; }
-    button:hover { background-color: #219150; }
-    #status { margin-top: 20px; text-align: center; font-weight: bold; }
-  </style>
-</head>
-<body>
-  <div class="card">
-    <h2>🍽️ 午餐菜單上傳系統 (Cloudflare 版)</h2>
+<div style="margin-top: 20px; padding: 15px; border: 1px solid #ffcccc; background: #fff5f5; border-radius: 8px;">
+  <h3 style="margin-top: 0;">🚨 臨時放假 / 停發設定</h3>
+  <input type="text" id="holidayDate" placeholder="例如: 10/23" style="padding: 5px;" />
+  <button onclick="setHoliday()" style="padding: 5px 10px; background: #ff4444; color: white; border: none; border-radius: 4px; cursor: pointer;">標記休假並停發</button>
+</div>
+
+<script>
+async function setHoliday() {
+  const dateStr = document.getElementById('holidayDate').value.trim();
+  if (!dateStr) return alert("請輸入日期，例如 10/23");
+
+  // 替換為您的 Cloudflare Worker 網址
+  const workerUrl = '您的_Worker_網址/save-single-holiday'; 
+
+  try {
+    const response = await fetch(workerUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ data: [[dateStr, "臨時休假", "臨時休假"]] })
+    });
     
-    <label>請輸入月份 (例如: 09 或 10)：</label>
-    <input type="number" id="monthInput" value="10" min="1" max="12">
-    
-    <label>🥩 上傳葷食菜單 (.xls / .xlsx)：</label>
-    <input type="file" id="fileMeat" accept=".xls,.xlsx">
-    
-    <label>🥦 上傳素食菜單 (.xls / .xlsx)：</label>
-    <input type="file" id="fileVeg" accept=".xls,.xlsx">
-    
-    <button onclick="processFiles()">自動解析並寫入資料庫</button>
-    <div id="status"></div>
-  </div>
-
-  <script>
-    // ⚠️ 請替換為您的 Cloudflare Worker 網址 (結尾不要帶斜線)
-    const WORKER_URL = "https://lunchbot.wpeanut001.workers.dev";
-
-    async function processFiles() {
-      const status = document.getElementById('status');
-      const month = document.getElementById('monthInput').value.padStart(2, '0');
-      const fileMeat = document.getElementById('fileMeat').files[0];
-      const fileVeg = document.getElementById('fileVeg').files[0];
-
-      if(!fileMeat || !fileVeg) {
-        status.innerText = '⚠️ 請同時上傳葷食與素食檔案！';
-        status.style.color = '#e67e22';
-        return;
-      }
-
-      status.innerText = '⏳ 處理中，請稍候...';
-      status.style.color = '#2980b9';
-
-      try {
-        const meatData = await readExcel(fileMeat);
-        const vegData = await readExcel(fileVeg);
-        
-        const meatParsed = parseMenu(meatData);
-        const vegParsed = parseMenu(vegData);
-        
-        let finalArray = [];
-        let allDays = new Set([...Object.keys(meatParsed), ...Object.keys(vegParsed)]);
-        let sortedDays = Array.from(allDays).sort((a,b) => parseInt(a) - parseInt(b));
-        
-        for(let day of sortedDays) {
-          let dateStr = month + "/" + String(day).padStart(2, '0');
-          let meatStr = meatParsed[day] || "無資料";
-          let vegStr = vegParsed[day] || "無資料";
-          finalArray.push([dateStr, meatStr, vegStr]);
-        }
-
-        if(finalArray.length === 0) {
-          status.innerText = '⚠️ 檔案中找不到符合的菜單資料。';
-          status.style.color = '#e67e22';
-          return;
-        }
-
-        // 發送 API 到 Cloudflare Worker
-        const res = await fetch(`${WORKER_URL}/save-menu`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ data: finalArray })
-        });
-        
-        const result = await res.json();
-        if(result.status === "success") {
-          status.innerText = result.message;
-          status.style.color = '#27ae60';
-        } else {
-          status.innerText = "❌ 寫入失敗: " + result.message;
-          status.style.color = '#c0392b';
-        }
-
-      } catch(e) {
-        status.innerText = '❌ 解析檔案發生錯誤：' + e.message;
-        status.style.color = '#c0392b';
-      }
+    const result = await response.json();
+    if (result.status === 'success') {
+      alert(`✅ 已成功將 ${dateStr} 標記為休假，當日將自動跳過推播！`);
     }
-
-    const readExcel = (file) => {
-      return new Promise((resolve, reject) => {
-        const reader = new FileReader();
-        reader.onload = (e) => {
-          try {
-            const data = new Uint8Array(e.target.result);
-            const workbook = XLSX.read(data, {type: 'array'});
-            const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
-            const json = XLSX.utils.sheet_to_json(firstSheet, {header: 1});
-            resolve(json);
-          } catch(err) { reject(err); }
-        };
-        reader.readAsArrayBuffer(file);
-      });
-    };
-
-    function parseMenu(sheetArray) {
-      let result = {};
-      let headerRow = -1, dateCol = -1, calCol = -1;
-      
-      for(let i=0; i<sheetArray.length; i++){
-        if(sheetArray[i] && sheetArray[i].includes("日期")){
-          headerRow = i;
-          dateCol = sheetArray[i].indexOf("日期");
-          calCol = sheetArray[i].findIndex(c => typeof c === 'string' && c.includes("熱量"));
-          break;
-        }
-      }
-      
-      if(headerRow === -1) return result;
-      
-      for(let i = headerRow+1; i<sheetArray.length; i++){
-        let row = sheetArray[i];
-        if(!row || !row[dateCol]) continue;
-        let day = row[dateCol];
-        if(isNaN(parseInt(day))) continue;
-        
-        let endCol = calCol !== -1 ? calCol : row.length;
-        let dishes = [];
-        for(let j = dateCol + 2; j < endCol; j++){
-          if(row[j] && String(row[j]).trim() !== ""){
-            dishes.push(String(row[j]).trim());
-          }
-        }
-        if(dishes.length > 0) result[day] = dishes.join("、");
-      }
-      return result;
-    }
-  </script>
-</body>
-</html>
+  } catch (error) {
+    alert("設定失敗，請檢查 API 網址或網路狀態。");
+  }
+}
+</script>
