@@ -177,6 +177,13 @@ async function setHoliday() {
     alert("設定發生錯誤，請檢查網路連線。");
   }
 }
+// 網頁載入完成後，自動將輸入框預設為「今天的日期」(格式 MM/DD)
+window.onload = function() {
+  const today = new Date();
+  const mm = String(today.getMonth() + 1).padStart(2, '0');
+  const dd = String(today.getDate()).padStart(2, '0');
+  document.getElementById('holidayDate').value = mm + '/' + dd;
+};
 </script>
 </body>
 </html>
